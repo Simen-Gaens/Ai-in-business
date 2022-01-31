@@ -1,0 +1,223 @@
+from sklearn.datasets import load_boston
+boston = load_boston()
+print(boston.DESCR)
+
+import pandas as pd
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+df = pd.DataFrame(boston.data.T,['CRIM','ZN','INDUS','CHAS','NOX','RM','AGE','DIS','RAD'
+       ,'TAX', 'PTRATIO','B','LSTAT'])                       #13 features
+df = df.T
+df['MEDV'] = boston.target.T    
+df.head()
+df.info()
+
+df.describe(include=['object', 'int32', 'int64', 'float64', 'bool', 'timedelta', 'category'])
+
+#Plot changes in MEDV across our instances
+df['MEDV'].plot(figsize=(20,10))
+#We see some deffinite outliers, percentage change would give a better view of these outliers
+
+#Percentage change in MEDV across our instances
+df['MEDV'].pct_change().plot(figsize=(20,10))
+
+#Let us look at some outliers
+sns.set(rc={'figure.figsize':(11.7,8.27)})
+sns.boxplot(data=df)
+
+#Using a scatterplot lets us see if Linear regression would be feasible or if maybe we should look at other methods
+medv=df["MEDV"]
+X = medv[:-1]
+Y= medv[1:]
+plt.scatter(X,Y,alpha=0.5)
+
+#Using some other plots for different attribute influences
+sns.lmplot(x='TAX', y='MEDV', data=df)
+sns.lmplot(x='PTRATIO', y='MEDV', data=df)
+sns.lmplot(x='LSTAT', y='MEDV', data=df)
+sns.lmplot(x='CRIM', y='MEDV', data=df)
+sns.lmplot(x='ZN', y='MEDV', data=df)
+sns.lmplot(x='INDUS', y='MEDV', data=df)
+sns.lmplot(x='CHAS', y='MEDV', data=df)
+sns.lmplot(x='RM', y='MEDV', data=df)
+sns.lmplot(x='NOX', y='MEDV', data=df)
+sns.lmplot(x='AGE', y='MEDV', data=df)
+sns.lmplot(x='DIS', y='MEDV', data=df)
+sns.lmplot(x='RAD', y='MEDV', data=df)
+sns.lmplot(x='B', y='MEDV', data=df)
+
+
+#These are only a few examples after running all of the plot, we notice that for most Features forcing a lineair influence on MDEV straight up is pretty difficult. However interaction effects could still make lineair influences
+
+#Before we go into futher analysis it would be useful to check the correlation matrix and see how the attribute correlate to MEDV
+corr = df.corr()
+sns.heatmap(data=corr,cmap='coolwarm', annot=True)
+
+#Before we start preprocessing we do splite the data set into 2 subsets, one used for training and one used for validating our results
+from sklearn.model_selection import train_test_split
+try:
+    y_data = df['MEDV']
+    del df['MEDV']
+except:
+  pass
+
+X_train, X_validation, y_train, y_validation = train_test_split(df, y_data, test_size=0.2, random_state=np.random)
+
+ df['CHAS'] = df['CHAS'].astype("Bool")
+ 
+ from sklearn.metrics import r2_score
+
+def performance_metric(y_true, y_predict):
+    score = r2_score(y_true, y_predict)
+    return score
+##############################################################################    
+from sklearn.linear_model import LinearRegression
+clf1 = LinearRegression()
+clf1.fit(X_train, y_train)
+predicted = clf1.predict(X_validation)
+expected = y_validation
+plt.scatter(expected, predicted)
+
+print("RMSE: %r " % np.sqrt(np.mean((predicted - expected) ** 2)))
+print(r2_score(expected,predicted))
+
+print("Traing acc:", clf1.score(X_train,y_train)*100)
+print("Test acc:", clf1.score(X_validation,y_validation)*100)
+##############################################################################
+from sklearn.ensemble import RandomForestRegressor
+RF=RandomForestRegressor(n_jobs=-1,oob_score=True)
+RF.fit(X_train, y_train)
+predicted = RF.predict(X_validation)
+expected = y_validation
+plt.scatter(expected, predicted)
+
+print("RMSE: %r " % np.sqrt(np.mean((predicted - expected) ** 2)))
+print("R^2 score:",r2_score(expected,predicted))
+
+print("Traing acc:", RF.score(X_train,y_train)*100)
+print("Test acc:", RF.score(X_validation,y_validation)*100)
+##############################################################################
+from sklearn.ensemble import GradientBoostingRegressor
+clf2 = GradientBoostingRegressor().fit(X_train, y_train)
+predicted = clf2.predict(X_validation)
+expected = y_validation
+plt.scatter(expected, predicted)
+
+print("RMSE: %r " % np.sqrt(np.mean((predicted - expected) ** 2)))
+print(r2_score(expected,predicted))
+
+print("Traing acc:", clf2.score(X_train,y_train)*100)
+print("Test acc:", clf2.score(X_validation,y_validation)*100)
+##############################################################################
+
+#based on subset of only items with highest correlation#
+
+train_subset= df[["LSTAT","PTRATIO","INDUS","RM","AGE", "ZN","TAX"]]
+X_train, X_validation, y_train, y_validation = train_test_split(train_subset, y_data, test_size=0.2, random_state=10)
+from sklearn.linear_model import LinearRegression
+clf1 = LinearRegression()
+clf1.fit(X_train, y_train)
+expected= y_validation
+predicted = clf1.predict(X_validation)
+plt.scatter(expected, predicted)
+
+print("RMSE: %r " % np.sqrt(np.mean((predicted - expected) ** 2)))
+print(r2_score(expected,predicted))
+
+print("Traing acc:", clf1.score(X_train,y_train)*100)
+print("Test acc:", clf1.score(X_validation,y_validation)*100)
+##############################################################################
+from sklearn.ensemble import RandomForestRegressor
+RF=RandomForestRegressor(n_jobs=-1,oob_score=True)
+RF.fit(X_train, y_train)
+predicted = RF.predict(X_validation)
+expected = y_validation
+plt.scatter(expected, predicted)
+
+print("RMSE: %r " % np.sqrt(np.mean((predicted - expected) ** 2)))
+print("R^2 score:",r2_score(expected,predicted))
+
+print("Traing acc:", RF.score(X_train,y_train)*100)
+##############################################################################
+from sklearn.ensemble import GradientBoostingRegressor
+clf2 = GradientBoostingRegressor().fit(X_train, y_train)
+predicted = clf2.predict(X_validation)
+expected = y_validation
+plt.scatter(expected, predicted)
+
+print("RMSE: %r " % np.sqrt(np.mean((predicted - expected) ** 2)))
+print("R^2:",r2_score(expected,predicted))
+
+print("Traing acc:", clf2.score(X_train,y_train)*100)
+print("Test acc:", clf2.score(X_validation,y_validation)*100)
+##############################################################################
+ 
+  #Fitting a Neural Network#
+X_train, X_validation, y_train, y_validation = train_test_split(df, y_data, test_size=0.2, random_state=np.random)
+
+from sklearn.preprocessing import MinMaxScaler
+scaler = MinMaxScaler()
+scaler.fit(X_train)
+X_train = scaler.transform(X_train)
+X_test = scaler.transform(X_validation)
+
+from keras.models import Sequential
+from keras.layers import Dense, Flatten
+from tensorflow.keras.optimizers import SGD
+
+mymodel = Sequential()
+mymodel.add(Dense(13, kernel_initializer='normal',input_dim = X_test.shape[1], activation='relu'))
+mymodel.add(Dense(26,activation='relu'))
+mymodel.add(Dense(26,activation='relu'))
+mymodel.add(Dense(1, kernel_initializer='normal',activation='linear'))
+mymodel.compile(loss='mean_absolute_error', optimizer='adam', metrics=['mean_absolute_error'])
+mymodel.fit(X_train, y_train, epochs=500, validation_data=[X_test, y_validation], verbose=0)
+
+mymodel.summary()
+
+from sklearn.metrics import mean_absolute_error,mean_squared_error
+predicted= mymodel.predict(X_test)
+print("MAE:", mean_absolute_error(y_validation,predicted))
+print("MSE:",ean_squared_error(y_validation,predicted))
+print("RMSE:",np.sqrt(mean_squared_error(y_validation,predicted)))
+
+expected= y_validation
+print("R^2:", r2_score(expected,predicted))
+##############################################################################
+#First we need to define how we would build a NN model
+def build_model(number_of_hidden_layers=1, number_of_neurons=2):
+  model = Sequential()
+  model.add(Dense(number_of_neurons, input_shape=(13,), activation='relu'))
+  for hidden_layer_number in range(1, number_of_hidden_layers):
+    model.add(Dense(number_of_neurons, activation='relu'))
+    model.add(Dense(1))
+    model.compile(optimizer='adam', loss='mse')
+
+  return model
+ 
+  #Next up we do define the number of hidden layers and number of neurons we want to test as our hyperparameters
+from tensorflow.keras.wrappers.scikit_learn import KerasRegressor
+from sklearn.model_selection import RandomizedSearchCV, KFold
+
+tuned_model = KerasRegressor(build_fn=build_model) 
+params = {
+      'number_of_hidden_layers': [2, 3, 4, 5],
+      'number_of_neurons': [5, 13, 26, 52]
+      }
+
+random_search = RandomizedSearchCV(tuned_model, param_distributions = params, cv = KFold(4))
+random_search.fit(X_train,y_train)
+random_search.best_estimator_.get_params()
+##############################################################################
+best_model = build_model(2, 52)
+best_model.fit(X_train,y_train, validation_split=0.2, epochs=200)
+print(f"The best model minimum mse loss on validation set is:  { min(best_model.history.history['val_loss']) } ")
+
+from sklearn.metrics import mean_absolute_error,mean_squared_error
+predicted2= best_model.predict(X_test)
+print("MSE:", mean_squared_error(y_validation,predicted2))
+print("RMSE:",np.sqrt(mean_squared_error(y_validation,predicted2)))
+
+print("R^2 score:", r2_score(y_validation,predicted2))
