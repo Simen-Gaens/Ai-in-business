@@ -1,0 +1,176 @@
+import pandas as pd
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+dfTrain = pd.read_csv("E:\Erasmus\Taiwan\Data science in BA\Market_Basket_Optimisation.csv", delimiter=",", decimal=",", header=None)
+dfTrain.head()
+
+dfTrain.dtypes
+dfTrain.info()
+dfTrain.head()
+
+#Getting frequencies of products
+df_res = pd.DataFrame()
+for i in range(len(dfTrain.columns)):
+    df_res = df_res.append(dfTrain[i].value_counts())
+
+df_sum = df_res.sum()
+df_sum = df_sum.sort_values(ascending=False)
+df_sum
+df_sum.head(20)
+
+from collections import Counter
+product_counts = Counter(df_sum)
+
+plt.figure(figsize=(20,10))
+#Only show the top 50 items
+cnt = 50
+color = plt.cm.spring(np.linspace(0, 1, cnt))
+df_sum.head(cnt).plot.bar(color = color)
+plt.grid(False)
+plt.axis('on')
+plt.show()
+
+plt.figure(figsize=(20,10))
+#Only show the top 20 items
+cnt = 20
+color = plt.cm.spring(np.linspace(0, 1, cnt))
+df_sum.head(cnt).plot.bar(color = color)
+plt.grid(False)
+plt.axis('on')
+plt.show()
+
+!pip install wordcloud
+from wordcloud import WordCloud
+wordcloud = WordCloud(width = 1000, height = 500, background_color = 'white', max_font_size = 90, random_state = 9).generate_from_frequencies(df_sum)
+plt.figure(figsize=(20,10))
+plt.axis("off")
+plt.title('Most Bought Items',fontsize = 30)
+plt.imshow(wordcloud);
+
+!pip install plotly 
+%pip install plotly --upgrade
+! jupyter labextension list
+! jupyter labextension install @jupyter-widgets/jupyterlab-manager jupyterlab-plotly
+product_count, product_label = zip(*sorted(zip(product_counts.values(), product_counts.keys()), 
+                                           reverse=True)) 
+import plotly.express as px
+fig = px.box(product_label,product_count)
+fig.show()
+
+import plotly.graph_objects as go
+fig = go.Figure([go.Box(x=product_label, boxpoints='all', name="Purchase Count")])
+fig.update_layout(title_text='Item Purchased Count')
+fig.show()
+
+!pip install apyori
+!pip install mlxtend
+
+
+#We want a clean transaction list
+cleaned_data = []
+for entry in dfTrain.values:
+    non_na_entry = []
+    for item in entry:
+        if type(item) == str:
+            non_na_entry.append(item)
+    cleaned_data.append(non_na_entry)
+from apyori import apriori
+#Define min_sup, min_confidence, min_lift and min_length
+min_support = 0.01 
+min_confidence = 0.10 
+min_lift = 2 # find the itemsets for which items X and Y for which the increase in Y is atleast doubled when bought together
+min_length = 2 #The length should be atleast 2
+max_length=4
+
+#Using the apriori algorithm we get the frequent itemsets these can then be further used in association rule mining
+itemsets = apriori(cleaned_data, min_support=min_support, min_confidence=min_confidence, min_lift=min_lift, min_length=min_length, max_length=max_length)
+itemset_list = list(itemsets)
+itemset_list
+
+def inspect_rules(items):
+    # get max lift rule
+    max_rule_idx = np.argmax([rules.lift for rules in items.ordered_statistics])
+    max_rule = items.ordered_statistics[max_rule_idx]
+    
+    # return itemset and stats with the chosen rule
+    return {
+        "frequent_itemset": list(items.items),
+        "support": round(items.support, 6),
+        "rule": str(list(max_rule.items_base)) + " -> " + str(list(max_rule.items_add)),
+        "confidence": round(max_rule.confidence, 6),
+        "lift": round(max_rule.lift, 6)
+    }
+
+# create dataframe for the frequent itemset obtained from apriori algorithm
+Rule_df = pd.DataFrame([inspect_rules(items) for items in itemset_list])
+Rule_df.sort_values(["support", "confidence", "lift"], ascending=False).head(5)
+
+#Show results by descending support
+Rule_df.nlargest(n = 15, columns = 'support')
+#Show results by descending confidence
+Rule_df.nlargest(n = 15, columns = 'confidence')
+#Show results by descending lift
+Rule_df.nlargest(n = 15, columns = 'lift')
+
+##################################################################################
+from mlxtend.preprocessing import TransactionEncoder
+transaction = []
+for i in range(dfTrain.shape[0]):
+    transaction.append([str(dfTrain.values[i,j]) for j in range(dfTrain.shape[1])])
+    # Apply TransactionEncoder to learns the unique labels in the dataset.
+transac = TransactionEncoder()
+dataset = transac.fit_transform(transaction)
+dataset
+
+dataset_df = pd.DataFrame(dataset, columns=transac.columns_)
+dataset_df
+
+from mlxtend.frequent_patterns import apriori, association_rules
+#first do apriori again
+frequent_itemsets = apriori(dataset_df, min_support=0.01, use_colnames=True)
+frequent_itemsets['length'] = frequent_itemsets['itemsets'].apply(lambda x : len(x))
+frequent_itemsets[frequent_itemsets['length'] >= 2].head(10)
+association_rules = association_rules(frequent_itemsets, metric="confidence", min_threshold=0.1) 
+association_rules.head(20)
+association_rules.head(20)
+
+association_rules.nsmallest(n = 15, columns = ['support', 'confidence'])
+association_rules.nsmallest(n = 15, columns = ['confidence'])
+association_rules.nlargest(n = 15, columns = 'lift', keep= 'first')
+#############################################################################################
+
+from mlxtend.frequent_patterns.fpgrowth import fpgrowth
+min_support = 7/len(dataset_df) 
+
+frequent_itemsets2 = fpgrowth(dataset_df, min_support=min_support, use_colnames = True)
+frequent_itemsets2.head(20)
+from mlxtend.frequent_patterns import association_rules
+assoc_rule=association_rules(frequent_itemsets2, metric="confidence", min_threshold=0.1) #We can play around a bit with the different metrics to see if there are interesting new finding this way
+assoc_rule.head(20)
+assoc_rule.nlargest(n = 15, columns = ['confidence','lift'])
+
+###########################################################################################
+
+!pip install pyECLAT
+# we are looking for itemSETS
+min_n_products = 2
+
+# min_supp as a percentage
+min_support = 3/len(df_sum.index)
+
+# Limit the size of the transaction rules
+max_length = 4
+from pyECLAT import ECLAT
+
+# create an instance of eclat
+my_eclat = ECLAT(data=dfTrain, verbose=True)
+
+# fit the algorithm
+rule_indices, rule_supports = my_eclat.fit(min_support=min_support,
+                                           min_combination=min_n_products,
+                                           max_combination=max_length)
+                                           
+print(rule_supports)
+print(rule_indices)
