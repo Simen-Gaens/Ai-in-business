@@ -1,0 +1,189 @@
+# Make sure we are using 2.x instead of 1.x
+%tensorflow_version 2.x
+# !pip install --upgrade keras # it's because we use tf2.0
+ 
+ 
+%matplotlib inline
+import numpy as np
+import matplotlib.pyplot as plt
+import pandas as pd
+
+from google.colab import drive
+drive.mount('/content/drive')
+ 
+ 
+# import data from drive
+path1 = "/content/drive/My Drive/Fashion datasets/fashion-mnist_train.csv"
+path2 = "/content/drive/My Drive/Fashion datasets/fashion-mnist_test.csv"
+ 
+ 
+df1 = pd.read_csv(path1)
+df2 = pd.read_csv(path2)
+
+#Training set
+Training_target = df1['label']
+Training_target.shape
+
+Training = df1.drop(columns='label') #Drop the labels for training
+Training.shape
+
+Training.head()
+Training = Training.values.reshape((60000, 28, 28,1)) #1 can be left out
+Training.shape
+
+from sklearn.model_selection import train_test_split
+x_train, x_test, y_train, y_test = train_test_split(Training,Training_target, test_size=0.25)
+
+# Define a function which can visualize the training set
+def see_train_image(n):
+  X = x_train[n].reshape(28,28)
+  plt.imshow(X, cmap='Greys')
+  #Look at item 1200
+see_train_image(100)
+print(y_train[100])
+
+# 0 T-shirt/top
+# 1 Trouser
+# 2 Pullover
+# 3 Dress
+# 4 Coat
+# 5 Sandal
+# 6 Shirt
+# 7 Sneaker
+# 8 Bag
+# 9 Ankle boot
+
+#Preprocess normalization
+x_train = x_train / 255.0
+
+x_test = x_test / 255.0
+
+from tensorflow.keras.utils import to_categorical
+y_train = to_categorical(y_train, 10)
+y_test = to_categorical(y_test, 10)
+
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Conv2D, MaxPooling2D,AveragePooling2D,GlobalAveragePooling2D # the only thing new in CNN
+from tensorflow.keras.layers import Dense, Flatten
+from tensorflow.keras.optimizers import SGD
+
+model1CNN = Sequential()
+
+model1CNN.add(Conv2D(28, (3,3), padding='same',
+                input_shape=(28,28,1),
+                activation='relu'))
+
+model1CNN.add(MaxPooling2D(pool_size=(2,2)))
+model1CNN.summary()
+model1CNN.add(Conv2D(56, (3,3), padding='same',
+                activation='relu'))
+model1CNN.add(MaxPooling2D(pool_size=(2,2)))
+model1CNN.summary()
+model1CNN.add(Conv2D(112, (3,3), padding='same',
+                activation='relu'))
+model1CNN.add(MaxPooling2D(pool_size=(2,2)))
+model1CNN.summary()
+
+model1CNN.add(Flatten())
+model1CNN.add(Dense(64, activation='relu'))
+model1CNN.add(Dense(10, activation='softmax'))
+model1CNN.summary()
+
+model1CNN.compile(loss='categorical_crossentropy', optimizer= 'adam',
+             metrics=['accuracy'])
+model1CNN.fit(x_train, y_train, batch_size=150, epochs=12)
+
+predict = model1CNN.predict(x_test)
+classes = np.argmax(predict,axis=1)
+
+def my_predict(n):
+    print('my CNN prediction', classes[n])
+    X = x_test[n].reshape(28,28)
+    plt.imshow(X, cmap='Greys')
+    
+from ipywidgets import interact_manual
+interact_manual(my_predict, n=(0, 9999))
+
+score = model1CNN.evaluate(x_test, y_test)
+
+# Preprocess for testing set
+df2.shape
+df2.head()
+x_valid = df2.values.reshape((10000, 28, 28,1))
+x_valid.shape
+
+prediction = model1CNN.predict(x_valid)
+est_classes = np.argmax(prediction,axis=1)
+
+def pred(n):
+   		print('my CNN prediction', labelNames[est_classes[n]])
+   		X = x_valid[n].reshape(28,28)
+   		plt.imshow(X, cmap='Greys')
+      
+from ipywidgets import interact_manual
+interact_manual(pred, n=(0, 9999))
+
+est_classes= pd.DataFrame(est_classes)
+est_classes.head()
+type(est_classes).__name__
+est_classes = pd.DataFrame(est_classes)
+est_classes.head()
+est_classes.columns = est_classes.columns.map(str)
+est_classes.head()
+est_classes = est_classes.rename(columns={"0": "label"})
+est_classes.head()
+est_classes['imageID'] = est_classes.index
+est_classes.head()
+est_classes = est_classes[[ 'imageID' , 'label']]
+est_classes.head()
+
+import os
+path5 = "/content/drive/My Drive/Fashion datasets/"
+est_classes.to_csv(os.path.join(path5,r'my_prediction12.csv'), index=False)
+
+############################################################################################
+
+Using a pretrained model was difficult as we are working with 1 Channel image data and most pretrained models are optimized for 3 channel (color) images
+
+#!pip install keras.applications
+
+#!apt install VGG19
+
+#import keras
+from keras.applications import VGG19
+from keras.applications.vgg19 import preprocess_input
+from keras.layers import Dense, Dropout
+from keras.models import Model
+from keras import models
+from keras import layers
+from keras import optimizers
+
+
+# Create the base model of VGG19
+#vgg19 = VGG19(weights='imagenet', include_top=False, input_shape = (150, 150, 3), classes = 10)
+
+
+
+# Preprocessing the input 
+#X_train = preprocess_input(X_train)
+X#_test = preprocess_input(X_test)
+
+# Extracting features
+#train_features = vgg19.predict(np.array(X_train), batch_size=256, verbose=1)
+"test_features = vgg19.predict(np.array(X_test), batch_size=256, verbose=1)
+
+# Flatten extracted features
+#train_features = np.reshape(train_features, (45000, 4*4*512))
+#test_features = np.reshape(test_features, (15000, 4*4*512))
+
+# Add Dense and Dropout layers on top of VGG19 pre-trained
+#model = models.Sequential()
+#model.add(layers.Dense(512, activation='relu', input_dim=4 * 4 * 512))
+#model.add(layers.Dropout(0.5))
+#model.add(layers.Dense(10, activation="softmax"))
+
+
+# Compile the model
+#model.compile(loss=keras.losses.categorical_crossentropy,
+              #optimizer=keras.optimizers.Adam(),
+              #metrics=['accuracy'])
